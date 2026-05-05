@@ -87,3 +87,4 @@ Cuando llega un mensaje en WhatsApp, el backend hace `POST` a `WEBHOOK_INCOMING_
 ## Nota importante
 
 Este proyecto usa `whatsapp-web.js` (automatización de WhatsApp Web), no la API oficial de WhatsApp Business Platform (Cloud API). Para producción empresarial estricta, revisa la opción oficial de Meta.
+# AiChat2
