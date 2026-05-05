@@ -1,0 +1,150 @@
+<main class="layout">
+  <header class="hero">
+    <div class="hero-text">
+      <span class="brand-tag">WhatsApp · QR Hub</span>
+      <h1>Conecta WhatsApp y enlaza tu chatbot</h1>
+      <p>Genera QR para cuentas normales o Business y enruta los mensajes entrantes a tu webhook en tiempo real.</p>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <strong>{{ sessions.length }}</strong>
+        <span>sesiones</span>
+      </div>
+      <div>
+        <strong>{{ events.length }}</strong>
+        <span>eventos</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="card">
+    <header class="card-head">
+      <h2>Nueva sesión</h2>
+      <p>Asigna un identificador y elige el modo. Se generará un QR escaneable desde WhatsApp en tu móvil.</p>
+    </header>
+
+    <div class="row">
+      <label>
+        Session ID
+        <input [(ngModel)]="newSessionId" placeholder="bot-main" />
+      </label>
+
+      <label>
+        Modo
+        <select [(ngModel)]="newSessionMode">
+          <option value="normal">WhatsApp Normal</option>
+          <option value="business">WhatsApp Business</option>
+        </select>
+      </label>
+
+      <button class="primary" (click)="startSession()">Iniciar y generar QR</button>
+      <button class="ghost" (click)="loadSessions()">Refrescar</button>
+    </div>
+
+    @if (errorMessage) {
+      <p class="error banner">{{ errorMessage }}</p>
+    }
+  </section>
+
+  <section class="grid">
+    <article class="card sessions">
+      <header class="card-head">
+        <h2>Sesiones</h2>
+        <p>Cada sesión mantiene su propio QR y credenciales locales.</p>
+      </header>
+
+      @if (isLoading) {
+        <p class="muted">Cargando...</p>
+      }
+
+      @if (!sessions.length && !isLoading) {
+        <div class="empty">
+          <p>Aún no hay sesiones.</p>
+          <span>Crea una arriba para generar tu primer QR.</span>
+        </div>
+      }
+
+      <div class="session-list">
+        @for (session of sessions; track trackBySessionId($index, session)) {
+          <div class="session-item">
+            <div class="session-head">
+              <div class="session-title">
+                <h3>{{ session.sessionId }}</h3>
+                <span class="pill mode">{{ session.mode }}</span>
+              </div>
+              <span class="badge {{ statusVariant(session.status) }}">{{ statusLabel(session.status) }}</span>
+            </div>
+
+            @if (session.connectedNumber) {
+              <p class="meta">📱 {{ session.connectedNumber }}</p>
+            }
+
+            @if (session.lastError) {
+              <p class="meta error">⚠ {{ session.lastError }}</p>
+            }
+
+            @if (session.qrDataUrl) {
+              <div class="qr-wrap">
+                <img [src]="session.qrDataUrl" alt="QR de {{ session.sessionId }}" class="qr" />
+                <span class="qr-hint">Escanéalo desde WhatsApp → Dispositivos vinculados</span>
+              </div>
+            }
+
+            <div class="actions">
+              <button class="ghost" (click)="stopSession(session.sessionId)">Detener</button>
+              <button class="danger" (click)="deleteSession(session.sessionId)">Eliminar</button>
+            </div>
+          </div>
+        }
+      </div>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h2>Enviar mensaje</h2>
+        <p>Prueba el envío manual sin pasar por el webhook.</p>
+      </header>
+      <div class="stack">
+        <label>
+          Session ID
+          <input [(ngModel)]="sendSessionId" placeholder="bot-main" />
+        </label>
+        <label>
+          Destino
+          <input [(ngModel)]="sendTo" placeholder="34600111222" />
+        </label>
+        <label>
+          Mensaje
+          <textarea rows="4" [(ngModel)]="sendText" placeholder="Hola desde el bot"></textarea>
+        </label>
+        <button class="primary" (click)="sendMessage()">Enviar</button>
+      </div>
+    </article>
+  </section>
+
+  <section class="card">
+    <header class="card-head">
+      <h2>Eventos en tiempo real</h2>
+      <p>Últimos 30 mensajes IN/OUT, vía Socket.IO.</p>
+    </header>
+
+    <div class="events">
+      @if (!events.length) {
+        <div class="empty">
+          <p>Sin eventos aún.</p>
+          <span>Aparecerán aquí en cuanto recibas o envíes un mensaje.</span>
+        </div>
+      }
+
+      @for (event of events; track $index) {
+        <div class="event {{ event.direction }}">
+          <span class="dir">{{ event.direction === 'incoming' ? 'IN' : 'OUT' }}</span>
+          <span class="ev-session">{{ event.sessionId }}</span>
+          <span class="ev-peer">{{ event.from || event.to }}</span>
+          <span class="ev-body">{{ event.body }}</span>
+          <span class="ev-time">{{ event.timestamp | date: 'HH:mm:ss' }}</span>
+        </div>
+      }
+    </div>
+  </section>
+</main>
