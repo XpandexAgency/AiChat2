@@ -7,7 +7,9 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run start",
     "start:backend": "npm --prefix backend run start",
-    "start:frontend": "npm --prefix frontend run start"
+    "start:frontend": "npm --prefix frontend run start",
+    "build:deploy": "bash scripts/deploy-branch.sh",
+    "publish:deploy": "bash scripts/deploy-branch.sh --push"
   },
   "keywords": [],
   "author": "",
