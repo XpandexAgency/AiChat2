@@ -99,7 +99,34 @@ async function forwardIncomingToWebhook(payload) {
   const headers = {};
   if (webhookConfig.secret) headers['x-webhook-secret'] = webhookConfig.secret;
 
-  await axios.post(webhookConfig.incomingUrl, payload, { headers, timeout: 15000 });
+  try {
+    const response = await axios.post(webhookConfig.incomingUrl, payload, { headers, timeout: 15000 });
+    // Si n8n responde con un mensaje de vuelta (webhook response)
+    if (response.data && response.data.to && response.data.text) {
+      const { to, text } = response.data;
+      // Enviar el mensaje de vuelta por WhatsApp
+      const sessionId = 'bot-main'; // Asumir sesión principal, ajustar si necesario
+      const session = sessions.get(sessionId);
+      if (session && session.client) {
+        try {
+          const chatId = normalizeChatId(to);
+          if (chatId) {
+            await session.client.sendMessage(chatId, text);
+            const outgoingPayload = {
+              sessionId,
+              message: { id: 'webhook-response', to: chatId, body: text },
+              timestamp: new Date().toISOString(),
+            };
+            io.emit('message:outgoing', outgoingPayload);
+          }
+        } catch (sendError) {
+          console.error('Error enviando mensaje desde webhook response:', sendError.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error en webhook entrante:', formatWebhookError(error));
+  }
 }
 
 function formatWebhookError(error) {
