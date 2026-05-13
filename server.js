@@ -9,7 +9,11 @@ const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { Server } = require('socket.io');
 
+console.log('Iniciando app Node...');
+
 dotenv.config();
+
+console.log('dotenv cargado');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +34,8 @@ const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:4200,http://1
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+console.log(`Configuración: PORT=${PORT}, HEADLESS=${HEADLESS}, CORS_ORIGINS=${CORS_ORIGINS.join(',')}`);
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || CORS_ORIGINS.includes(origin)) {
@@ -42,6 +48,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
+
+console.log('Express configurado');
 
 const sessions = new Map();
 const webhookConfig = {
@@ -383,6 +391,7 @@ app.post('/api/webhooks/chatbot', (req, res) => {
 
 // Servir archivos estáticos del frontend
 const staticPath = path.join(__dirname, 'deploy', 'browser');
+console.log(`Sirviendo archivos estáticos desde: ${staticPath}`);
 app.use(express.static(staticPath));
 
 // SPA fallback
@@ -394,6 +403,12 @@ io.on('connection', (socket) => {
   socket.emit('sessions:init', Array.from(sessions.values()).map(serializeSession));
 });
 
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-});
+console.log(`Intentando escuchar en puerto ${PORT}...`);
+
+try {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
+  });
+} catch (error) {
+  console.error('Error al iniciar servidor:', error.message);
+}
