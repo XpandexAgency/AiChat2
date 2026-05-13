@@ -9,7 +9,7 @@ const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { Server } = require('socket.io');
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 const server = http.createServer(app);
@@ -23,7 +23,7 @@ const io = new Server(server, {
 const PORT = Number(process.env.PORT || 3000);
 const DEFAULT_WEBHOOK_INCOMING_URL = process.env.WEBHOOK_INCOMING_URL || '';
 const DEFAULT_WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
-const AUTH_DATA_PATH = process.env.AUTH_DATA_PATH || path.resolve(__dirname, '.wwebjs_auth');
+const AUTH_DATA_PATH = process.env.AUTH_DATA_PATH || path.resolve(__dirname, '..', '.wwebjs_auth');
 const HEADLESS = process.env.HEADLESS !== 'false';
 const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:4200,http://127.0.0.1:4200')
   .split(',')
@@ -204,169 +204,271 @@ async function startSession(sessionId, mode = 'normal') {
   client.on('message', async (message) => {
     if (message.fromMe) return;
 
-    const sessionId = 'bot-main'; // Asumir sesión principal, ajustar si necesario
     const payload = {
       type: 'incoming_message',
       source: 'whatsapp-web',
       sessionId,
-      mode: 'normal',
+      mode,
       timestamp: new Date().toISOString(),
       message: {
-        id: message.id.id,
+        id: message.id?._serialized || null,
         from: message.from,
-        body: message.body,
+        body: message.body || '',
         type: message.type,
         hasMedia: message.hasMedia,
       },
     };
 
     io.emit('message:incoming', payload);
-    await forwardIncomingToWebhook(payload);
+
+    try {
+      await forwardIncomingToWebhook(payload);
+      updateSession(sessionId, { lastError: null });
+    } catch (error) {
+      updateSession(sessionId, {
+        lastError: `Error enviando webhook entrante: ${formatWebhookError(error)}`,
+      });
+    }
   });
 
-  try {
-    await client.initialize();
-    updateSession(sessionId, { status: 'initialized' });
-  } catch (error) {
-    updateSession(sessionId, {
-      status: 'error',
-      lastError: `Error al inicializar: ${error.message}`,
-    });
-  }
+  client
+    .initialize()
+    .catch((error) => updateSession(sessionId, { status: 'error', lastError: error.message }));
 
   return session;
 }
 
 async function stopSession(sessionId) {
   const session = sessions.get(sessionId);
-  if (!session || !session.client) return;
+  if (!session) return false;
 
   try {
-    await session.client.destroy();
-    updateSession(sessionId, { status: 'stopped', qrDataUrl: null, connectedNumber: null });
+    if (session.client) {
+      await session.client.destroy();
+    }
   } catch (error) {
-    updateSession(sessionId, { status: 'error', lastError: `Error al detener: ${error.message}` });
+    updateSession(sessionId, { lastError: `Error al cerrar sesión: ${error.message}` });
   }
+
+  updateSession(sessionId, {
+    status: 'stopped',
+    qrDataUrl: null,
+    connectedNumber: null,
+    client: null,
+  });
+
+  return true;
 }
 
 async function deleteSession(sessionId) {
-  await stopSession(sessionId);
+  const session = sessions.get(sessionId);
+
+  if (session?.client) {
+    try {
+      await session.client.destroy();
+    } catch {
+      // ignore — vamos a borrar igualmente
+    }
+  }
+
   sessions.delete(sessionId);
+
+  const authDir = path.join(AUTH_DATA_PATH, `session-${sessionId}`);
+  try {
+    await fs.rm(authDir, { recursive: true, force: true });
+  } catch (error) {
+    io.emit('session:removed', { sessionId, warning: `No se pudo borrar ${authDir}: ${error.message}` });
+    return { ok: true, warning: error.message };
+  }
+
   io.emit('session:removed', { sessionId });
+  return { ok: true };
 }
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+async function sendMessage(sessionId, to, text) {
+  const session = sessions.get(sessionId);
+  if (!session || !session.client) {
+    throw new Error(`La sesión ${sessionId} no existe o no está inicializada.`);
+  }
+
+  if (session.status !== 'ready') {
+    throw new Error(`La sesión ${sessionId} no está lista. Estado: ${session.status}`);
+  }
+
+  const chatId = to.includes('@') ? to : normalizeChatId(to);
+  if (!chatId) {
+    throw new Error('Destino inválido. Usa número internacional, por ejemplo: 34600111222');
+  }
+
+  const sent = await session.client.sendMessage(chatId, text);
+
+  const payload = {
+    type: 'outgoing_message',
+    source: 'chatbot',
+    sessionId,
+    timestamp: new Date().toISOString(),
+    message: {
+      id: sent.id?._serialized || null,
+      to: chatId,
+      body: text,
+    },
+  };
+
+  io.emit('message:outgoing', payload);
+
+  return payload;
+}
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, now: new Date().toISOString() });
 });
 
-app.get('/api/webhook-config', (req, res) => {
+app.get('/api/webhook-config', (_req, res) => {
   res.json(serializeWebhookConfig());
 });
 
 app.put('/api/webhook-config', (req, res) => {
-  const { incomingUrl, secret } = req.body;
-  if (typeof incomingUrl === 'string') webhookConfig.incomingUrl = incomingUrl;
-  if (typeof secret === 'string') webhookConfig.secret = secret;
-  res.json(serializeWebhookConfig());
+  const incomingUrl = String(req.body?.incomingUrl || '').trim();
+  const secret = String(req.body?.secret || '').trim();
+
+  if (incomingUrl) {
+    try {
+      const parsed = new URL(incomingUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return res.status(400).json({ error: 'El webhook debe empezar por http:// o https://' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'URL de webhook inválida' });
+    }
+  }
+
+  webhookConfig.incomingUrl = incomingUrl;
+  webhookConfig.secret = secret;
+  return res.json({ ok: true, config: serializeWebhookConfig() });
 });
 
 app.post('/api/webhook-config/test', async (req, res) => {
+  const incomingUrl = String(req.body?.incomingUrl || '').trim() || webhookConfig.incomingUrl;
+  const secret = String(req.body?.secret || '').trim() || webhookConfig.secret;
+
+  if (!incomingUrl) {
+    return res.status(400).json({ error: 'Configura primero la URL del webhook' });
+  }
+
   try {
-    await forwardIncomingToWebhook({ type: 'test', timestamp: new Date().toISOString() });
-    res.json({ success: true });
+    const parsed = new URL(incomingUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'El webhook debe empezar por http:// o https://' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'URL de webhook inválida' });
+  }
+
+  const headers = {};
+  if (secret) headers['x-webhook-secret'] = secret;
+
+  const payload = {
+    type: 'webhook_test',
+    source: 'whatsapp-web',
+    timestamp: new Date().toISOString(),
+    message: 'Prueba manual desde panel',
+  };
+
+  try {
+    const response = await axios.post(incomingUrl, payload, { headers, timeout: 15000 });
+    return res.json({ ok: true, status: response.status });
   } catch (error) {
-    res.status(500).json({ error: formatWebhookError(error) });
+    return res.status(400).json({ error: formatWebhookError(error) });
   }
 });
 
-app.get('/api/sessions', (req, res) => {
-  const list = Array.from(sessions.values()).map(serializeSession);
-  res.json(list);
+app.get('/api/sessions', (_req, res) => {
+  const data = [...sessions.values()].map(serializeSession);
+  res.json(data);
+});
+
+app.get('/api/sessions/:sessionId', (req, res) => {
+  const session = sessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Sesión no encontrada' });
+  }
+
+  return res.json(serializeSession(session));
 });
 
 app.post('/api/sessions/start', async (req, res) => {
-  const { sessionId, mode } = req.body;
-  if (!sessionId) return res.status(400).json({ error: 'sessionId requerido' });
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const mode = req.body?.mode === 'business' ? 'business' : 'normal';
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId es requerido' });
+  }
 
   try {
     const session = await startSession(sessionId, mode);
-    res.json(serializeSession(session));
+    return res.status(201).json(serializeSession(session));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/sessions/:sessionId/stop', async (req, res) => {
-  const { sessionId } = req.params;
-  await stopSession(sessionId);
-  res.json({ success: true });
+  const ok = await stopSession(req.params.sessionId);
+  if (!ok) {
+    return res.status(404).json({ error: 'Sesión no encontrada' });
+  }
+
+  return res.json({ ok: true });
 });
 
 app.delete('/api/sessions/:sessionId', async (req, res) => {
-  const { sessionId } = req.params;
-  await deleteSession(sessionId);
-  res.json({ success: true });
+  const result = await deleteSession(req.params.sessionId);
+  return res.json(result);
 });
 
 app.post('/api/messages/send', async (req, res) => {
-  const { sessionId, to, text } = req.body;
-  if (!sessionId || !to || !text) return res.status(400).json({ error: 'sessionId, to y text requeridos' });
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const to = String(req.body?.to || '').trim();
+  const text = String(req.body?.text || '').trim();
 
-  const session = sessions.get(sessionId);
-  if (!session || !session.client) return res.status(404).json({ error: 'Sesión no encontrada o no lista' });
+  if (!sessionId || !to || !text) {
+    return res.status(400).json({ error: 'sessionId, to y text son requeridos' });
+  }
 
   try {
-    const chatId = normalizeChatId(to);
-    if (!chatId) return res.status(400).json({ error: 'Número de teléfono inválido' });
-
-    const message = await session.client.sendMessage(chatId, text);
-    const payload = {
-      sessionId,
-      message: { id: message.id.id, to: chatId, body: text },
-      timestamp: new Date().toISOString(),
-    };
-    io.emit('message:outgoing', payload);
-    res.json({ success: true, messageId: message.id.id });
+    const result = await sendMessage(sessionId, to, text);
+    return res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(400).json({ error: error.message });
   }
 });
 
-app.post('/api/webhooks/chatbot', (req, res) => {
-  if (!isAuthorizedWebhook(req)) return res.status(401).json({ error: 'No autorizado' });
+app.post('/api/webhooks/chatbot', async (req, res) => {
+  if (!isAuthorizedWebhook(req)) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
 
-  const { sessionId, to, text } = req.body;
-  if (!sessionId || !to || !text) return res.status(400).json({ error: 'sessionId, to y text requeridos' });
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const to = String(req.body?.to || '').trim();
+  const text = String(req.body?.text || '').trim();
 
-  const session = sessions.get(sessionId);
-  if (!session || !session.client) return res.status(404).json({ error: 'Sesión no encontrada o no lista' });
+  if (!sessionId || !to || !text) {
+    return res.status(400).json({ error: 'sessionId, to y text son requeridos' });
+  }
 
-  session.client.sendMessage(normalizeChatId(to), text)
-    .then((message) => {
-      const payload = {
-        sessionId,
-        message: { id: message.id.id, to: normalizeChatId(to), body: text },
-        timestamp: new Date().toISOString(),
-      };
-      io.emit('message:outgoing', payload);
-      res.json({ success: true, messageId: message.id.id });
-    })
-    .catch((error) => res.status(500).json({ error: error.message }));
-});
-
-// Servir archivos estáticos del frontend
-const staticPath = path.join(__dirname, 'deploy', 'browser');
-app.use(express.static(staticPath));
-
-// SPA fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'));
+  try {
+    const result = await sendMessage(sessionId, to, text);
+    return res.json({ ok: true, result });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 io.on('connection', (socket) => {
-  socket.emit('sessions:init', Array.from(sessions.values()).map(serializeSession));
+  const list = [...sessions.values()].map(serializeSession);
+  socket.emit('sessions:init', list);
 });
 
 server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`Backend listo en http://localhost:${PORT}`);
 });
