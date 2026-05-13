@@ -9,7 +9,14 @@ const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const { Server } = require('socket.io');
 
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+const envPath = path.resolve(__dirname, '..', '.env');
+const dotenvResult = dotenv.config({ path: envPath });
+console.log('dotenv cargado', dotenvResult.error ? `ERROR ${dotenvResult.error.message}` : 'OK');
+console.log('dotenv path:', envPath);
+console.log('process.env.PORT before listen:', process.env.PORT);
+console.log('process.cwd():', process.cwd());
+console.log('__dirname:', __dirname);
+console.log('__filename:', __filename);
 
 const app = express();
 const server = http.createServer(app);

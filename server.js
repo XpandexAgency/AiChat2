@@ -11,9 +11,15 @@ const { Server } = require('socket.io');
 
 console.log('Iniciando app Node...');
 
-dotenv.config();
-
-console.log('dotenv cargado');
+const envPath = path.resolve(__dirname, '.env');
+const dotenvResult = dotenv.config({ path: envPath });
+console.log('dotenv cargado', dotenvResult.error ? `ERROR ${dotenvResult.error.message}` : 'OK');
+console.log('dotenv path:', envPath);
+console.log('dotenv result keys:', dotenvResult.parsed ? Object.keys(dotenvResult.parsed).join(', ') : 'none');
+console.log('process.env.PORT before listen:', process.env.PORT);
+console.log('process.cwd():', process.cwd());
+console.log('__dirname:', __dirname);
+console.log('__filename:', __filename);
 
 const app = express();
 const server = http.createServer(app);
