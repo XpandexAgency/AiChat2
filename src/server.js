@@ -469,6 +469,10 @@ io.on('connection', (socket) => {
   socket.emit('sessions:init', list);
 });
 
-server.listen(PORT, () => {
-  console.log(`Backend listo en http://localhost:${PORT}`);
+server.on('error', (error) => {
+  console.error('Error en el servidor HTTP:', error);
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend listo en http://0.0.0.0:${PORT}`);
 });

@@ -405,6 +405,10 @@ io.on('connection', (socket) => {
 
 console.log(`Intentando escuchar en puerto ${PORT}...`);
 
+server.on('error', (error) => {
+  console.error('Error en el servidor HTTP:', error);
+});
+
 try {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
