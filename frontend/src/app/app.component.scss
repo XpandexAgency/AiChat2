@@ -112,6 +112,11 @@ h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 }
 
 .card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 14px;
 
   h2 {
@@ -123,6 +128,11 @@ h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
     color: var(--text-dim);
     font-size: 0.88rem;
   }
+}
+
+.log-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .grid {
@@ -141,6 +151,17 @@ h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .stack {
   display: grid;
   gap: 12px;
+}
+
+.webhook-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.webhook-meta {
+  font-size: 0.82rem;
+  color: var(--text-dim);
 }
 
 label {
@@ -182,6 +203,7 @@ button {
 }
 
 button:active { transform: translateY(1px); }
+button:disabled { opacity: 0.65; cursor: not-allowed; }
 
 button.primary {
   color: #06120a;
@@ -338,6 +360,35 @@ button.danger:hover {
   gap: 8px;
 }
 
+.error-log {
+  display: grid;
+  gap: 8px;
+}
+
+.error-row {
+  display: grid;
+  grid-template-columns: 76px 170px 140px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
+.err-time,
+.err-source,
+.err-session {
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+}
+
+.err-message {
+  color: #fecaca;
+  overflow-wrap: anywhere;
+}
+
 .event {
   display: grid;
   grid-template-columns: 56px 130px 180px 1fr 70px;
@@ -401,6 +452,8 @@ button.danger:hover {
   .row button { grid-column: span 1; }
   .event { grid-template-columns: 50px 1fr 1fr 60px; }
   .event .ev-body { grid-column: 1 / -1; }
+  .error-row { grid-template-columns: 70px 130px 1fr; }
+  .error-row .err-message { grid-column: 1 / -1; }
 }
 
 @media (max-width: 640px) {
@@ -408,4 +461,8 @@ button.danger:hover {
   .hero { flex-direction: column; align-items: stretch; }
   .hero-stats { justify-content: stretch; }
   .hero-stats > div { flex: 1; }
+  .log-actions { width: 100%; }
+  .log-actions button { flex: 1; }
+  .webhook-actions button { flex: 1; }
+  .error-row { grid-template-columns: 1fr; }
 }

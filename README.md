@@ -53,6 +53,10 @@ Backend: `http://localhost:3000`
 ## Endpoints principales
 
 - `GET /api/health`
+- `GET /api/webhook-config`
+- `PUT /api/webhook-config`
+  - body: `{ "incomingUrl": "https://tu-n8n/webhook/...", "secret": "opcional" }`
+- `POST /api/webhook-config/test`
 - `GET /api/sessions`
 - `POST /api/sessions/start`
   - body: `{ "sessionId": "bot-main", "mode": "normal" | "business" }`

@@ -46,6 +46,45 @@
     }
   </section>
 
+  <section class="card">
+    <header class="card-head">
+      <h2>Webhook n8n</h2>
+      <p>Conecta aquí tu webhook de n8n para recibir mensajes entrantes de WhatsApp.</p>
+    </header>
+
+    <div class="stack">
+      <label>
+        URL Webhook n8n
+        <input
+          [(ngModel)]="webhookIncomingUrl"
+          placeholder="https://tu-n8n/webhook/whatsapp-incoming"
+        />
+      </label>
+
+      <label>
+        Secreto (opcional)
+        <input
+          [(ngModel)]="webhookSecret"
+          type="password"
+          placeholder="x-webhook-secret"
+        />
+      </label>
+
+      <div class="webhook-meta">
+        <span>Secreto guardado actualmente: {{ webhookSecretConfigured ? 'Sí' : 'No' }}</span>
+      </div>
+
+      <div class="webhook-actions">
+        <button class="primary" (click)="saveWebhookConfig()" [disabled]="isWebhookSaving">
+          {{ isWebhookSaving ? 'Guardando...' : 'Guardar webhook' }}
+        </button>
+        <button class="ghost" (click)="testWebhookConfig()" [disabled]="isWebhookTesting">
+          {{ isWebhookTesting ? 'Probando...' : 'Probar webhook' }}
+        </button>
+      </div>
+    </div>
+  </section>
+
   <section class="grid">
     <article class="card sessions">
       <header class="card-head">
@@ -120,6 +159,37 @@
         <button class="primary" (click)="sendMessage()">Enviar</button>
       </div>
     </article>
+  </section>
+
+  <section class="card">
+    <header class="card-head">
+      <div>
+        <h2>Log de errores</h2>
+        <p>Últimos errores de API, Socket, sesión y frontend para que puedas copiarlos y pasármelos.</p>
+      </div>
+      <div class="log-actions">
+        <button class="ghost" (click)="copyErrorLogs()">Copiar log</button>
+        <button class="ghost" (click)="clearErrorLogs()">Limpiar</button>
+      </div>
+    </header>
+
+    <div class="error-log">
+      @if (!errorLogs.length) {
+        <div class="empty">
+          <p>Sin errores registrados.</p>
+          <span>Cuando ocurra alguno aparecerá aquí con fecha y origen.</span>
+        </div>
+      }
+
+      @for (entry of errorLogs; track $index) {
+        <div class="error-row">
+          <span class="err-time">{{ entry.timestamp | date: 'HH:mm:ss' }}</span>
+          <span class="err-source">{{ entry.source }}</span>
+          <span class="err-session">{{ entry.sessionId || '-' }}</span>
+          <span class="err-message">{{ entry.message }}</span>
+        </div>
+      }
+    </div>
   </section>
 
   <section class="card">

@@ -15,21 +15,46 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
+    origin: true,
     methods: ['GET', 'POST'],
   },
 });
 
 const PORT = Number(process.env.PORT || 3000);
-const WEBHOOK_INCOMING_URL = process.env.WEBHOOK_INCOMING_URL || '';
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+const DEFAULT_WEBHOOK_INCOMING_URL = process.env.WEBHOOK_INCOMING_URL || '';
+const DEFAULT_WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const AUTH_DATA_PATH = process.env.AUTH_DATA_PATH || path.resolve(__dirname, '..', '.wwebjs_auth');
 const HEADLESS = process.env.HEADLESS !== 'false';
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:4200,http://127.0.0.1:4200')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:4200' }));
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || CORS_ORIGINS.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origen no permitido por CORS: ${origin}`));
+  },
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
 
 const sessions = new Map();
+const webhookConfig = {
+  incomingUrl: DEFAULT_WEBHOOK_INCOMING_URL,
+  secret: DEFAULT_WEBHOOK_SECRET,
+};
+
+function serializeWebhookConfig() {
+  return {
+    incomingUrl: webhookConfig.incomingUrl,
+    secretConfigured: Boolean(webhookConfig.secret),
+  };
+}
 
 function serializeSession(session) {
   return {
@@ -64,17 +89,41 @@ function normalizeChatId(phoneOrChatId) {
 }
 
 function isAuthorizedWebhook(req) {
-  if (!WEBHOOK_SECRET) return true;
-  return req.header('x-webhook-secret') === WEBHOOK_SECRET;
+  if (!webhookConfig.secret) return true;
+  return req.header('x-webhook-secret') === webhookConfig.secret;
 }
 
 async function forwardIncomingToWebhook(payload) {
-  if (!WEBHOOK_INCOMING_URL) return;
+  if (!webhookConfig.incomingUrl) return;
 
   const headers = {};
-  if (WEBHOOK_SECRET) headers['x-webhook-secret'] = WEBHOOK_SECRET;
+  if (webhookConfig.secret) headers['x-webhook-secret'] = webhookConfig.secret;
 
-  await axios.post(WEBHOOK_INCOMING_URL, payload, { headers, timeout: 15000 });
+  await axios.post(webhookConfig.incomingUrl, payload, { headers, timeout: 15000 });
+}
+
+function formatWebhookError(error) {
+  const code = error?.code ? String(error.code) : '';
+  const message = error?.message ? String(error.message) : '';
+  const status = error?.response?.status ? String(error.response.status) : '';
+
+  let detail = '';
+  if (error?.response?.data) {
+    if (typeof error.response.data === 'string') {
+      detail = error.response.data.slice(0, 180);
+    } else {
+      try {
+        detail = JSON.stringify(error.response.data).slice(0, 180);
+      } catch {
+        detail = '';
+      }
+    }
+  }
+
+  const base = [code, message].filter(Boolean).join(' - ') || 'sin detalle';
+  const statusPart = status ? ` (HTTP ${status})` : '';
+  const detailPart = detail ? ` | body: ${detail}` : '';
+  return `${base}${statusPart}${detailPart}`;
 }
 
 async function startSession(sessionId, mode = 'normal') {
@@ -174,9 +223,10 @@ async function startSession(sessionId, mode = 'normal') {
 
     try {
       await forwardIncomingToWebhook(payload);
+      updateSession(sessionId, { lastError: null });
     } catch (error) {
       updateSession(sessionId, {
-        lastError: `Error enviando webhook entrante: ${error.message}`,
+        lastError: `Error enviando webhook entrante: ${formatWebhookError(error)}`,
       });
     }
   });
@@ -271,6 +321,65 @@ async function sendMessage(sessionId, to, text) {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, now: new Date().toISOString() });
+});
+
+app.get('/api/webhook-config', (_req, res) => {
+  res.json(serializeWebhookConfig());
+});
+
+app.put('/api/webhook-config', (req, res) => {
+  const incomingUrl = String(req.body?.incomingUrl || '').trim();
+  const secret = String(req.body?.secret || '').trim();
+
+  if (incomingUrl) {
+    try {
+      const parsed = new URL(incomingUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return res.status(400).json({ error: 'El webhook debe empezar por http:// o https://' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'URL de webhook inválida' });
+    }
+  }
+
+  webhookConfig.incomingUrl = incomingUrl;
+  webhookConfig.secret = secret;
+  return res.json({ ok: true, config: serializeWebhookConfig() });
+});
+
+app.post('/api/webhook-config/test', async (req, res) => {
+  const incomingUrl = String(req.body?.incomingUrl || '').trim() || webhookConfig.incomingUrl;
+  const secret = String(req.body?.secret || '').trim() || webhookConfig.secret;
+
+  if (!incomingUrl) {
+    return res.status(400).json({ error: 'Configura primero la URL del webhook' });
+  }
+
+  try {
+    const parsed = new URL(incomingUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'El webhook debe empezar por http:// o https://' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'URL de webhook inválida' });
+  }
+
+  const headers = {};
+  if (secret) headers['x-webhook-secret'] = secret;
+
+  const payload = {
+    type: 'webhook_test',
+    source: 'whatsapp-web',
+    timestamp: new Date().toISOString(),
+    message: 'Prueba manual desde panel',
+  };
+
+  try {
+    const response = await axios.post(incomingUrl, payload, { headers, timeout: 15000 });
+    return res.json({ ok: true, status: response.status });
+  } catch (error) {
+    return res.status(400).json({ error: formatWebhookError(error) });
+  }
 });
 
 app.get('/api/sessions', (_req, res) => {
