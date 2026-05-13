@@ -2,6 +2,7 @@
   "name": "chatbot-deploy-runtime",
   "private": true,
   "version": "1.0.0",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
@@ -9,12 +10,13 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
     "axios": "^1.16.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "pino": "^9.5.0",
     "qrcode": "^1.5.4",
-    "socket.io": "^4.8.3",
-    "whatsapp-web.js": "^1.34.7"
+    "socket.io": "^4.8.3"
   }
 }
