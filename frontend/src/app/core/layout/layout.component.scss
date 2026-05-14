@@ -1,0 +1,240 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: rgba(20, 20, 27, 0.88);
+  border-right: 1px solid var(--border);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(236, 72, 153, 0.32);
+    display: inline-flex;
+
+    svg, img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  }
+
+  strong {
+    display: block;
+    font-size: 0.94rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  small {
+    display: block;
+    color: var(--text-dim);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+}
+
+.nav-section {
+  display: grid;
+  gap: 6px;
+  align-content: start;   // no estirar las filas para rellenar el contenedor
+}
+
+.nav-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 12px;
+  margin-bottom: 2px;
+}
+
+.nav {
+  display: grid;
+  gap: 2px;
+  align-content: start;   // mismo motivo: filas content-sized
+}
+
+.nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.86rem;
+  transition: background 0.12s ease, color 0.12s ease;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.nav a .ico {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  opacity: 0.85;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.nav a:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  .ico { color: var(--text); opacity: 1; }
+}
+
+.nav a.active {
+  background: rgba(236, 72, 153, 0.10);
+  color: var(--accent);
+  .ico { color: var(--accent); opacity: 1; }
+}
+
+.nav a.active::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.6);
+}
+
+.sidebar-foot {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: auto;       // empuja el footer al fondo del sidebar (flex column)
+  border-top: 1px solid var(--border);
+}
+
+.socket-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  padding: 0 4px;
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--mute);
+    flex-shrink: 0;
+  }
+
+  &.ok .dot { background: var(--accent); box-shadow: 0 0 8px rgba(236, 72, 153, 0.6); }
+  &.err .dot { background: var(--err); }
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(56, 189, 248, 0.10));
+    border: 1px solid rgba(236, 72, 153, 0.25);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .user-meta {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .user-meta strong {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .logout {
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .logout:hover { color: var(--accent); }
+}
+
+.content {
+  padding: 28px 36px 48px;
+  max-width: 1280px;
+  width: 100%;
+}
+
+@media (max-width: 880px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+  }
+  .nav-section { display: none; }
+  .sidebar-foot {
+    flex-direction: row;
+    border-top: 0;
+    padding-top: 0;
+    gap: 16px;
+    margin-left: auto;
+  }
+  .content { padding: 20px 16px 40px; }
+}

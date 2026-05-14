@@ -1,0 +1,129 @@
+<header class="page-head">
+  <div>
+    <h1>Sesiones de WhatsApp</h1>
+    <p class="muted">Vista global de todas las sesiones activas. Para gestión por cliente, abre el cliente desde el menú.</p>
+  </div>
+</header>
+
+@if (error(); as msg) {
+  <p class="error-banner">{{ msg }}</p>
+}
+@if (notice(); as msg) {
+  <p class="success-banner">{{ msg }}</p>
+}
+
+<section class="card">
+  <h2>Nueva sesión</h2>
+  <p class="muted" style="margin-top:4px;font-size:.88rem">
+    Selecciona el cliente al que pertenece y dale un identificador único.
+  </p>
+  <div class="form-grid" style="margin-top:14px;grid-template-columns:1.2fr 1.4fr 1fr auto;align-items:end">
+    <label>
+      Cliente
+      <select [(ngModel)]="newSessionClientId">
+        <option [ngValue]="null" disabled>Selecciona...</option>
+        @for (c of clients(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Session ID
+      <input [(ngModel)]="newSessionId" placeholder="bot-main" />
+    </label>
+    <label>
+      Modo
+      <select [(ngModel)]="newSessionMode">
+        <option value="normal">Normal</option>
+        <option value="business">Business</option>
+      </select>
+    </label>
+    <button class="primary" (click)="startSession()">Iniciar</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Activas</h2>
+  @if (!sessions().length) {
+    <div class="empty" style="margin-top:14px">
+      <p>Sin sesiones activas</p>
+      <span>Crea una arriba o desde la página del cliente.</span>
+    </div>
+  } @else {
+    <table class="data" style="margin-top:14px">
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>Cliente</th>
+          <th>Estado</th>
+          <th>Número</th>
+          <th>Modo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of sessions(); track s.sessionId) {
+          <tr>
+            <td class="mono"><strong>{{ s.sessionId }}</strong></td>
+            <td>
+              @if (s.clientId) {
+                <a [routerLink]="['/clients', s.clientId]">{{ clientName(s.clientId) }}</a>
+              } @else { <span class="dim">—</span> }
+            </td>
+            <td><span class="badge {{ statusVariant(s.status) }}">{{ statusLabel(s.status) }}</span></td>
+            <td>{{ s.connectedNumber || '—' }}</td>
+            <td>{{ s.mode || '—' }}</td>
+            <td class="right">
+              <button class="ghost" (click)="stopSession(s.sessionId)">Parar</button>
+              <button class="danger" (click)="removeSession(s.sessionId)">Eliminar</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
+
+<section class="card">
+  <h2>Enviar mensaje (manual)</h2>
+  <div class="form-grid" style="margin-top:14px">
+    <label>
+      Session ID
+      <input [(ngModel)]="sendSessionId" placeholder="bot-main" />
+    </label>
+    <label>
+      Destino
+      <input [(ngModel)]="sendTo" placeholder="34600111222" />
+    </label>
+    <label class="full">
+      Mensaje
+      <textarea rows="3" [(ngModel)]="sendText"></textarea>
+    </label>
+  </div>
+  <div class="form-actions">
+    <button class="primary" (click)="sendMessage()">Enviar</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Eventos en tiempo real</h2>
+  <p class="muted" style="margin-top:4px;font-size:.88rem">Últimos 60 mensajes IN/OUT vía Socket.IO.</p>
+  @if (!events().length) {
+    <div class="empty" style="margin-top:14px">
+      <p>Sin eventos aún</p>
+      <span>Aparecerán cuando se envíe o reciba un mensaje.</span>
+    </div>
+  } @else {
+    <div class="events">
+      @for (ev of events(); track $index) {
+        <div class="event {{ ev.direction }}">
+          <span class="dir">{{ ev.direction === 'incoming' ? 'IN' : 'OUT' }}</span>
+          <span class="ev-session mono">{{ ev.sessionId }}</span>
+          <span class="ev-peer">{{ ev.from || ev.to }}</span>
+          <span class="ev-body">{{ ev.body }}</span>
+          <span class="ev-time">{{ ev.timestamp | date: 'HH:mm:ss' }}</span>
+        </div>
+      }
+    </div>
+  }
+</section>

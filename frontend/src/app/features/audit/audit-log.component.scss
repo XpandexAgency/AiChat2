@@ -1,0 +1,11 @@
+/* Audit-only styles. Layout/table helpers viven en src/styles.scss */
+
+.filters-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 880px) {
+  .filters-grid { grid-template-columns: 1fr 1fr; }
+}

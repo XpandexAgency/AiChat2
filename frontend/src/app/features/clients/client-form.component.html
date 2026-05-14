@@ -1,0 +1,80 @@
+<header class="page-head">
+  <div>
+    <h1>{{ isEdit ? 'Editar cliente' : 'Nuevo cliente' }}</h1>
+    <p class="muted">
+      {{ isEdit ? 'Actualiza la información o la configuración del webhook.' : 'Crea un cliente; luego podrás vincular sus sesiones de WhatsApp.' }}
+    </p>
+  </div>
+  <div class="actions">
+    <a class="ghost btn-link" routerLink="/clients">← Volver</a>
+  </div>
+</header>
+
+@if (loading()) {
+  <p class="muted">Cargando...</p>
+} @else {
+  <form (submit)="$event.preventDefault(); submit()" class="card">
+    <div class="form-grid">
+      <label>
+        Nombre *
+        <input [(ngModel)]="model.name" name="name" placeholder="ACME Corp" required />
+      </label>
+
+      <label>
+        Email contacto
+        <input [(ngModel)]="model.email" name="email" type="email" placeholder="hola@cliente.com" />
+      </label>
+
+      <label>
+        Teléfono contacto
+        <input [(ngModel)]="model.phone" name="phone" placeholder="+34 600 111 222" />
+      </label>
+
+      <label>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" [(ngModel)]="model.isActive" name="isActive" style="width:auto" />
+          Cliente activo
+        </span>
+      </label>
+
+      <label class="full">
+        Descripción
+        <textarea [(ngModel)]="model.description" name="description" rows="3" placeholder="Notas internas sobre el cliente"></textarea>
+      </label>
+
+      <label class="full">
+        Tags (separados por comas)
+        <input [(ngModel)]="model.tagsText" name="tagsText" placeholder="vip, pruebas, comercial" />
+      </label>
+
+      <label class="full">
+        Webhook URL (entrante n8n)
+        <input [(ngModel)]="model.webhookIncomingUrl" name="webhookIncomingUrl" placeholder="https://n8n.example.com/webhook/whatsapp" />
+      </label>
+
+      <label class="full">
+        Webhook secret
+        <input
+          [(ngModel)]="model.webhookSecret"
+          name="webhookSecret"
+          type="password"
+          [placeholder]="hasExistingSecret ? '•••••••• (deja vacío para mantener el actual)' : 'Cabecera x-webhook-secret'"
+        />
+        @if (hasExistingSecret) {
+          <small class="muted">Hay un secret configurado. Si dejas vacío, se mantiene.</small>
+        }
+      </label>
+    </div>
+
+    @if (error(); as msg) {
+      <p class="error-banner">{{ msg }}</p>
+    }
+
+    <div class="form-actions">
+      <a class="ghost btn-link" routerLink="/clients">Cancelar</a>
+      <button class="primary" type="submit" [disabled]="saving()">
+        {{ saving() ? 'Guardando...' : (isEdit ? 'Guardar cambios' : 'Crear cliente') }}
+      </button>
+    </div>
+  </form>
+}

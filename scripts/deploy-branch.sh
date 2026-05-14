@@ -39,9 +39,17 @@ find "$WORKTREE_DIR" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 mkdir -p "$WORKTREE_DIR/deploy"
 rsync -a --delete "$DEPLOY_DIR/" "$WORKTREE_DIR/deploy/"
 
-# Copiar backend src/server.js como entry-point en la raíz del worktree
-# (única fuente de verdad: el archivo en backend/src/server.js)
-cp "$ROOT_DIR/backend/src/server.js" "$WORKTREE_DIR/server.js"
+# Copiar TODO backend/src/* a la raíz del worktree.
+# Tras el refactor de Fase 1, server.js depende de config.js, db/, middleware/,
+# modules/, etc. No vale con copiar solo server.js.
+rsync -a \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.baileys_auth/' \
+  --exclude='.wwebjs_auth/' \
+  --exclude='.wwebjs_cache/' \
+  --exclude='node_modules/' \
+  "$ROOT_DIR/backend/src/" "$WORKTREE_DIR/"
 
 # Copiar README desde raíz
 cp "$ROOT_DIR/README.md" "$WORKTREE_DIR/README_PROJECT.md"
@@ -62,9 +70,13 @@ cat > "$WORKTREE_DIR/package.json" <<'JSON'
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
     "axios": "^1.16.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.3.0",
+    "mysql2": "^3.11.3",
     "pino": "^9.5.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3"

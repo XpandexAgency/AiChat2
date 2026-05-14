@@ -1,0 +1,66 @@
+.events {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 56px 130px 180px 1fr 70px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+}
+
+.event .dir {
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-align: center;
+}
+
+.event .ev-session {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.event .ev-peer {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.event .ev-body {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event .ev-time {
+  text-align: right;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+}
+
+.event.incoming {
+  border-left-color: var(--accent);
+  .dir { background: rgba(236, 72, 153, 0.16); color: var(--accent); }
+}
+
+.event.outgoing {
+  border-left-color: var(--info);
+  .dir { background: rgba(56, 189, 248, 0.16); color: var(--info); }
+}
+
+@media (max-width: 980px) {
+  .event { grid-template-columns: 50px 1fr 1fr 60px; }
+  .event .ev-body { grid-column: 1 / -1; }
+}

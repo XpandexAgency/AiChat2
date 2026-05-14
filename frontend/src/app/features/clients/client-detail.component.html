@@ -1,0 +1,116 @@
+@if (!client() && loading()) {
+  <p class="muted">Cargando...</p>
+}
+@if (!client() && error(); as msg) {
+  <p class="error-banner">{{ msg }}</p>
+}
+
+@if (client(); as c) {
+  <header class="detail-head">
+    <div>
+      <a class="muted" routerLink="/clients">← Clientes</a>
+      <h1 style="margin-top:6px">{{ c.name }}</h1>
+      <div class="meta">
+        @if (c.isActive) { <span class="badge ok">Activo</span> } @else { <span class="badge mute">Inactivo</span> }
+        @for (t of c.tags; track t) { <span class="tag">{{ t }}</span> }
+        <span class="dim mono">#{{ c.id }}</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="ghost" (click)="toggleActive()">
+        {{ c.isActive ? 'Desactivar' : 'Activar' }}
+      </button>
+      <a class="ghost btn-link" [routerLink]="['/clients', c.id, 'edit']">Editar</a>
+      <button class="danger" (click)="deleteClient()">Borrar</button>
+    </div>
+  </header>
+
+  @if (error(); as msg) {
+    <p class="error-banner">{{ msg }}</p>
+  }
+  @if (notice(); as msg) {
+    <p class="success-banner">{{ msg }}</p>
+  }
+
+  <div class="detail-grid">
+    <section class="card">
+      <h2>Información</h2>
+      <dl class="kv" style="margin-top:14px">
+        <dt>Email</dt><dd>{{ c.email || '—' }}</dd>
+        <dt>Teléfono</dt><dd>{{ c.phone || '—' }}</dd>
+        <dt>Descripción</dt><dd>{{ c.description || '—' }}</dd>
+        <dt>Creado</dt><dd>{{ c.createdAt | date: 'medium' }}</dd>
+        <dt>Actualizado</dt><dd>{{ c.updatedAt | date: 'medium' }}</dd>
+      </dl>
+
+      <h2 style="margin-top:24px">Webhook</h2>
+      <dl class="kv" style="margin-top:14px">
+        <dt>URL entrante</dt>
+        <dd class="mono">{{ c.webhookIncomingUrl || '— (no configurado)' }}</dd>
+        <dt>Secret</dt>
+        <dd>{{ c.webhookSecretConfigured ? '••• configurado' : '— (sin secret)' }}</dd>
+      </dl>
+      @if (c.webhookIncomingUrl) {
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="ghost" (click)="testWebhook()" [disabled]="testing()">
+            {{ testing() ? 'Probando...' : 'Probar webhook' }}
+          </button>
+        </div>
+      }
+    </section>
+
+    <section class="card">
+      <h2>Sesiones WhatsApp</h2>
+      <p class="muted" style="margin-top:4px;font-size:.88rem">
+        Cada sesión es un número de WhatsApp vinculado a este cliente.
+      </p>
+
+      <div class="form-grid" style="margin-top:14px;grid-template-columns:1.4fr 1fr auto;align-items:end">
+        <label>
+          Session ID
+          <input [(ngModel)]="newSessionId" placeholder="bot-main" />
+        </label>
+        <label>
+          Modo
+          <select [(ngModel)]="newSessionMode">
+            <option value="normal">Normal</option>
+            <option value="business">Business</option>
+          </select>
+        </label>
+        <button class="primary" (click)="startSession()" [disabled]="!c.isActive">Iniciar</button>
+      </div>
+      @if (!c.isActive) {
+        <p class="muted" style="margin-top:8px;font-size:.85rem">
+          Activa el cliente para poder iniciar sesiones.
+        </p>
+      }
+
+      <div class="sessions-block" style="margin-top:18px">
+        @if (!clientSessions().length) {
+          <div class="empty">
+            <p>Sin sesiones aún</p>
+            <span>Arranca una sesión y aparecerá el QR para escanear.</span>
+          </div>
+        }
+        @for (s of clientSessions(); track s.sessionId) {
+          <div class="session-row">
+            <span class="id">{{ s.sessionId }}</span>
+            <span class="badge {{ statusVariant(s.status) }}">{{ statusLabel(s.status) }}</span>
+            @if (s.connectedNumber) { <span class="small">📱 {{ s.connectedNumber }}</span> }
+            <span class="grow"></span>
+            <button class="ghost" (click)="stopSession(s.sessionId)">Parar</button>
+            <button class="danger" (click)="removeSession(s.sessionId)">Eliminar</button>
+          </div>
+          @if (s.qrDataUrl) {
+            <div style="background:#fff;padding:12px;border-radius:12px;display:flex;justify-content:center">
+              <img [src]="s.qrDataUrl" alt="QR {{ s.sessionId }}" style="width:220px;height:220px;image-rendering:pixelated" />
+            </div>
+          }
+          @if (s.lastError) {
+            <p class="error-banner" style="margin-top:0">⚠ {{ s.lastError }}</p>
+          }
+        }
+      </div>
+    </section>
+  </div>
+}
