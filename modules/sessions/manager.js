@@ -225,7 +225,9 @@ async function connectSocket(session) {
       if (io) io.emit('message:incoming', payload);
 
       try {
-        const reply = await webhooks.forwardIncoming(session.clientId, payload);
+        const reply = await webhooks.forwardIncoming(session.clientId, payload, {
+          connectedNumber: session.connectedNumber,
+        });
         updateSession(session.sessionId, { lastError: null });
         if (reply && session.sock) {
           const jid = normalizeJid(reply.to);
