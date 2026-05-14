@@ -1,11 +1,13 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
+// override:true es crítico — Hostinger/Passenger inyecta env vars cacheadas que
+// no se borran al cambiarlas en hPanel. Sin override, el .env queda ignorado.
 let envPath = path.resolve(__dirname, '.env');
-let dotenvResult = dotenv.config({ path: envPath });
+let dotenvResult = dotenv.config({ path: envPath, override: true });
 if (dotenvResult.error) {
   const fallback = path.resolve(__dirname, '..', '.env');
-  const retry = dotenv.config({ path: fallback });
+  const retry = dotenv.config({ path: fallback, override: true });
   if (!retry.error) {
     dotenvResult = retry;
     envPath = fallback;
@@ -29,11 +31,22 @@ const optionalVars = [
   'AUTH_DATA_PATH',
 ];
 
-for (const v of requiredVars) {
-  if (!process.env[v]) {
-    throw new Error(`Missing required env var: ${v}`);
-  }
+// Loguea explícitamente para que Hostinger lo capture en console.log
+console.log(`Node version: ${process.version}`);
+console.log(`process.cwd(): ${process.cwd()}`);
+console.log(`__dirname: ${__dirname}`);
+
+const missing = requiredVars.filter((v) => !process.env[v]);
+if (missing.length > 0) {
+  console.error('==========================================');
+  console.error('STARTUP FAILED: faltan env vars requeridas');
+  console.error('Faltan:', missing.join(', '));
+  console.error('Presentes:', requiredVars.filter((v) => process.env[v]).join(', ') || '(ninguna)');
+  console.error('==========================================');
+  process.exit(1);
 }
+
+console.log('Env vars requeridas: OK');
 
 module.exports = {
   PORT: Number(process.env.PORT || 3000),

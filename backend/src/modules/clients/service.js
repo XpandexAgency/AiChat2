@@ -1,8 +1,9 @@
+const crypto = require('crypto');
 const pool = require('../../db/pool');
 
 const SELECT_FIELDS = `
   id, name, email, phone, description, is_active,
-  tags, webhook_incoming_url, webhook_secret,
+  tags, webhook_incoming_url, webhook_secret, pairing_token,
   created_by, created_at, updated_at
 `;
 
@@ -18,10 +19,15 @@ function rowToClient(row) {
     tags: parseTags(row.tags),
     webhookIncomingUrl: row.webhook_incoming_url,
     webhookSecretConfigured: Boolean(row.webhook_secret),
+    pairingToken: row.pairing_token,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function generatePairingToken() {
+  return crypto.randomBytes(32).toString('hex'); // 64 hex chars
 }
 
 function parseTags(raw) {
@@ -85,13 +91,32 @@ async function createClient(input, createdBy) {
 
   if (webhookUrl) validateUrl(webhookUrl);
 
+  const pairingToken = generatePairingToken();
+
   const [result] = await pool.execute(
     `INSERT INTO clients
-      (name, email, phone, description, is_active, tags, webhook_incoming_url, webhook_secret, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, email, phone, description, isActive, tags ? JSON.stringify(tags) : null, webhookUrl, webhookSecret, createdBy || null],
+      (name, email, phone, description, is_active, tags, webhook_incoming_url, webhook_secret, pairing_token, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, email, phone, description, isActive, tags ? JSON.stringify(tags) : null, webhookUrl, webhookSecret, pairingToken, createdBy || null],
   );
   return getClient(result.insertId);
+}
+
+async function regeneratePairingToken(id) {
+  const current = await getClient(id);
+  if (!current) return null;
+  const newToken = generatePairingToken();
+  await pool.execute('UPDATE clients SET pairing_token = ? WHERE id = ?', [newToken, id]);
+  return getClient(id);
+}
+
+async function findByPairingToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const [rows] = await pool.execute(
+    `SELECT ${SELECT_FIELDS} FROM clients WHERE pairing_token = ? LIMIT 1`,
+    [token],
+  );
+  return rowToClient(rows[0]);
 }
 
 async function updateClient(id, input) {
@@ -176,4 +201,6 @@ module.exports = {
   createClient,
   updateClient,
   deleteClient,
+  regeneratePairingToken,
+  findByPairingToken,
 };

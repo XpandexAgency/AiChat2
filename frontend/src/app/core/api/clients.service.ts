@@ -12,6 +12,7 @@ export interface Client {
   tags: string[];
   webhookIncomingUrl: string | null;
   webhookSecretConfigured: boolean;
+  pairingToken: string | null;
   createdBy: number | null;
   createdAt: string;
   updatedAt: string;
@@ -57,5 +58,9 @@ export class ClientsService {
 
   sessions(id: number): Observable<any[]> {
     return this.http.get<any[]>(`${this.base}/${id}/sessions`);
+  }
+
+  regeneratePairing(id: number): Observable<Client> {
+    return this.http.post<Client>(`${this.base}/${id}/pairing/regenerate`, {});
   }
 }

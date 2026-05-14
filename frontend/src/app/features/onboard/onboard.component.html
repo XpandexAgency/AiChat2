@@ -1,0 +1,130 @@
+<div class="onboard">
+  <div class="onboard-card">
+    <header class="brand">
+      <img src="/xpandex-icon.webp" alt="Xpandex" class="logo" />
+      <div>
+        <h1>XPANDEX</h1>
+        <p>Vincula tu WhatsApp</p>
+      </div>
+    </header>
+
+    @if (loading() && !view()) {
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Cargando tu enlace…</p>
+      </div>
+    }
+
+    @if (error(); as msg) {
+      <div class="error-state">
+        <div class="icon-circle err">!</div>
+        <h2>No se pudo cargar</h2>
+        <p>{{ msg }}</p>
+        <p class="muted small">Si el problema continúa, contacta con tu administrador.</p>
+      </div>
+    }
+
+    @if (view(); as v) {
+      <p class="greeting">Hola <strong>{{ v.client.name }}</strong> 👋</p>
+
+      @if (!v.client.isActive) {
+        <div class="state-block warn">
+          <div class="icon-circle warn">!</div>
+          <h2>Cuenta inactiva</h2>
+          <p>Tu administrador ha desactivado tu cuenta. Contacta con él para reactivarla.</p>
+        </div>
+      } @else if (!v.sessions.length) {
+        <!-- Sin sesión iniciada todavía → mostramos botón "Iniciar vinculación" -->
+        <div class="state-block">
+          <h2>Vincula tu número de WhatsApp</h2>
+          <p class="muted">Pulsa el botón y te mostraremos el código para escanear desde tu móvil. Tardarás menos de un minuto.</p>
+          <button class="primary" (click)="startSession()" [disabled]="starting()">
+            {{ starting() ? 'Iniciando…' : 'Iniciar vinculación' }}
+          </button>
+        </div>
+      }
+      @if (v.client.isActive && v.sessions.length && primarySession(); as s) {
+        @if (statusKind(s.status) === 'ready') {
+          <div class="state-block success">
+            <div class="icon-circle ok">✓</div>
+            <h2>¡Conectado!</h2>
+            @if (s.connectedNumber) {
+              <p class="phone">{{ formatPhone(s.connectedNumber) }}</p>
+            }
+            <p class="muted small">Tu WhatsApp ya está vinculado y recibe mensajes automáticamente.</p>
+          </div>
+        }
+        @if (statusKind(s.status) === 'progress') {
+          <div class="status-pill progress">{{ statusLabel(s.status) }}</div>
+
+          <ol class="steps">
+            <li>
+              <span class="step-num">1</span>
+              <div>
+                <strong>Abre WhatsApp en tu móvil</strong>
+                <small>El móvil donde quieres recibir los mensajes.</small>
+              </div>
+            </li>
+            <li>
+              <span class="step-num">2</span>
+              <div>
+                <strong>Ve a Ajustes → Dispositivos vinculados</strong>
+                <small>En iPhone: pestaña "Ajustes" abajo. En Android: menú con los tres puntos arriba a la derecha.</small>
+              </div>
+            </li>
+            <li>
+              <span class="step-num">3</span>
+              <div>
+                <strong>Toca "Vincular un dispositivo"</strong>
+                <small>Te pedirá desbloquear el móvil con huella o cara.</small>
+              </div>
+            </li>
+            <li>
+              <span class="step-num">4</span>
+              <div>
+                <strong>Escanea este código con tu cámara</strong>
+                <small>Mantén la cámara estable hasta que se conecte.</small>
+              </div>
+            </li>
+          </ol>
+
+          <div class="qr-block">
+            @if (s.qrDataUrl) {
+              <img [src]="s.qrDataUrl" alt="Código QR" class="qr" />
+              <p class="qr-hint">El código se renueva automáticamente cada minuto.</p>
+            } @else {
+              <div class="qr placeholder">
+                <div class="spinner"></div>
+                <p>Generando tu código…</p>
+              </div>
+            }
+          </div>
+        }
+        @if (statusKind(s.status) === 'error') {
+          <div class="state-block">
+            <div class="icon-circle err">!</div>
+            <h2>{{ statusLabel(s.status) }}</h2>
+            @if (s.lastError) {
+              <p class="muted small">{{ s.lastError }}</p>
+            }
+            <button class="primary" (click)="startSession()" [disabled]="starting()">
+              {{ starting() ? 'Reintentando…' : 'Reintentar' }}
+            </button>
+          </div>
+        }
+        @if (statusKind(s.status) === 'idle') {
+          <div class="state-block">
+            <p class="muted">{{ statusLabel(s.status) }}</p>
+            <button class="primary" (click)="startSession()" [disabled]="starting()">
+              {{ starting() ? 'Iniciando…' : 'Iniciar vinculación' }}
+            </button>
+          </div>
+        }
+      }
+    }
+
+    <footer class="card-foot">
+      <small class="muted">Powered by Xpandex · chatbot.cartonlife.net</small>
+    </footer>
+  </div>
+</div>

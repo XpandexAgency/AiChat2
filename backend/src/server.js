@@ -18,6 +18,7 @@ const sessionsRoutes = require('./modules/sessions/routes');
 const messagesRoutes = require('./modules/sessions/messages-routes');
 const sessionsManager = require('./modules/sessions/manager');
 const webhookRoutes = require('./modules/webhooks/routes');
+const pairingRoutes = require('./modules/pairing/routes');
 
 console.log('Iniciando app Node...');
 
@@ -59,6 +60,7 @@ app.use('/api/clients', clientsRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/pairing', pairingRoutes);
 
 sessionsManager.init(io);
 

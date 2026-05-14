@@ -61,3 +61,19 @@
 .session-row .id { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
 .session-row .grow { flex: 1; }
 .session-row .small { color: var(--text-dim); font-size: 0.8rem; }
+
+.pairing-url {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+
+  input {
+    flex: 1;
+    min-width: 220px;
+    font-size: 0.78rem;
+    background: var(--surface-2);
+    cursor: text;
+  }
+}

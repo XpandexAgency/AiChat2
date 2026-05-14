@@ -43,6 +43,23 @@
         <dt>Actualizado</dt><dd>{{ c.updatedAt | date: 'medium' }}</dd>
       </dl>
 
+      <h2 style="margin-top:24px">Enlace de vinculación</h2>
+      <p class="muted" style="margin-top:4px;font-size:.85rem">
+        Comparte este enlace con el cliente. Verá una página guiada para escanear su QR de WhatsApp.
+      </p>
+      @if (c.pairingToken) {
+        <div class="pairing-url">
+          <input readonly [value]="pairingUrl(c.pairingToken)" class="mono" />
+          <button class="ghost" (click)="copyPairingUrl()">Copiar</button>
+          <a class="ghost btn-link" [href]="pairingUrl(c.pairingToken)" target="_blank" rel="noopener">Abrir</a>
+        </div>
+        <button class="link" style="margin-top:8px" (click)="regeneratePairing()" [disabled]="regenerating()">
+          {{ regenerating() ? 'Regenerando…' : 'Regenerar enlace (invalida el anterior)' }}
+        </button>
+      } @else {
+        <p class="muted small">Sin token generado.</p>
+      }
+
       <h2 style="margin-top:24px">Webhook</h2>
       <dl class="kv" style="margin-top:14px">
         <dt>URL entrante</dt>

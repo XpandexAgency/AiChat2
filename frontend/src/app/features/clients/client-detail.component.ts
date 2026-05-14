@@ -27,6 +27,41 @@ export class ClientDetailComponent implements OnInit, OnDestroy {
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
   readonly testing = signal(false);
+  readonly regenerating = signal(false);
+
+  pairingUrl(token: string | null): string {
+    if (!token) return '';
+    return `${window.location.origin}/connect/${token}`;
+  }
+
+  async copyPairingUrl() {
+    const url = this.pairingUrl(this.client()?.pairingToken ?? null);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.notice.set('Enlace copiado al portapapeles');
+    } catch {
+      this.error.set('No se pudo copiar — selecciona y copia manualmente.');
+    }
+  }
+
+  regeneratePairing() {
+    const c = this.client();
+    if (!c) return;
+    if (!confirm('¿Generar un enlace nuevo? El enlace anterior dejará de funcionar.')) return;
+    this.regenerating.set(true);
+    this.clientsApi.regeneratePairing(c.id).subscribe({
+      next: (updated) => {
+        this.client.set(updated);
+        this.regenerating.set(false);
+        this.notice.set('Enlace regenerado. El anterior ya no funciona.');
+      },
+      error: (err) => {
+        this.regenerating.set(false);
+        this.error.set(errorToMessage(err, 'No se pudo regenerar el enlace'));
+      },
+    });
+  }
 
   // Sesiones del cliente: combinamos lo que la BD persiste (initial fetch) con
   // updates en vivo del socket (filter sessions del manager por clientId).

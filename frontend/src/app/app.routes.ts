@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    // Pública: el cliente final accede con su pairing token, sin login
+    path: 'connect',
+    loadChildren: () => import('./features/onboard/onboard.routes').then((m) => m.ONBOARD_ROUTES),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./core/layout/layout.component').then((m) => m.LayoutComponent),

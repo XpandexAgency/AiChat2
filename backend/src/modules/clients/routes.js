@@ -55,6 +55,19 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.post('/:id/pairing/regenerate', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id inválido' });
+  try {
+    const updated = await clientsService.regeneratePairingToken(id);
+    if (!updated) return res.status(404).json({ error: 'Cliente no encontrado' });
+    auditLog(req.adminId, 'client.pairing_regenerate', 'client', String(id), {}, req).catch(() => {});
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'id inválido' });
