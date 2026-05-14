@@ -1,11 +1,13 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
+// override:true es crítico — Hostinger/Passenger inyecta env vars cacheadas que
+// no se borran al cambiarlas en hPanel. Sin override, el .env queda ignorado.
 let envPath = path.resolve(__dirname, '.env');
-let dotenvResult = dotenv.config({ path: envPath });
+let dotenvResult = dotenv.config({ path: envPath, override: true });
 if (dotenvResult.error) {
   const fallback = path.resolve(__dirname, '..', '.env');
-  const retry = dotenv.config({ path: fallback });
+  const retry = dotenv.config({ path: fallback, override: true });
   if (!retry.error) {
     dotenvResult = retry;
     envPath = fallback;
