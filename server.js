@@ -94,6 +94,12 @@ async function startServer() {
     process.exit(1);
   }
 
+  // Re-arranca sesiones WA que estaban vivas antes del último restart.
+  // No bloquea el listen: cada reconexión va en su propia promise.
+  sessionsManager.resumeSessions().catch((err) => {
+    console.error('resumeSessions error:', err.message);
+  });
+
   server.listen(config.PORT, () => {
     console.log(`Backend listo en puerto ${config.PORT}`);
   });
