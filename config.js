@@ -29,11 +29,22 @@ const optionalVars = [
   'AUTH_DATA_PATH',
 ];
 
-for (const v of requiredVars) {
-  if (!process.env[v]) {
-    throw new Error(`Missing required env var: ${v}`);
-  }
+// Loguea explícitamente para que Hostinger lo capture en console.log
+console.log(`Node version: ${process.version}`);
+console.log(`process.cwd(): ${process.cwd()}`);
+console.log(`__dirname: ${__dirname}`);
+
+const missing = requiredVars.filter((v) => !process.env[v]);
+if (missing.length > 0) {
+  console.error('==========================================');
+  console.error('STARTUP FAILED: faltan env vars requeridas');
+  console.error('Faltan:', missing.join(', '));
+  console.error('Presentes:', requiredVars.filter((v) => process.env[v]).join(', ') || '(ninguna)');
+  console.error('==========================================');
+  process.exit(1);
 }
+
+console.log('Env vars requeridas: OK');
 
 module.exports = {
   PORT: Number(process.env.PORT || 3000),
