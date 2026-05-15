@@ -175,13 +175,18 @@ async function connectSocket(session) {
       const current = sessions.get(session.sessionId);
 
       if (loggedOut) {
+        // IMPORTANTE: NO borramos los creds de disco aquí. Baileys reporta
+        // 'loggedOut' a veces por desconexiones espurias, no solo cuando
+        // realmente se desvincula el dispositivo. Borrar los creds
+        // automáticamente obligaba a re-escanear QR sin razón.
+        // Si los creds son inválidos de verdad, el siguiente "Start" fallará
+        // y se mostrará auth_failure → el usuario decide borrar desde el panel.
         updateSession(session.sessionId, {
           status: 'auth_failure',
           connectedNumber: null,
           qrDataUrl: null,
-          lastError: `Sesión cerrada en WhatsApp (${reasonName}). Vuelve a escanear el QR.`,
+          lastError: `Sesión rechazada por WhatsApp (${reasonName}). Pulsa "Iniciar" para reintentar o "Eliminar" para vincular un número nuevo.`,
         });
-        try { await fs.rm(authDir, { recursive: true, force: true }); } catch { /* ignore */ }
         session.sock = null;
       } else if (current && current.status !== 'stopped') {
         updateSession(session.sessionId, {
@@ -225,7 +230,9 @@ async function connectSocket(session) {
       if (io) io.emit('message:incoming', payload);
 
       try {
-        const reply = await webhooks.forwardIncoming(session.clientId, payload);
+        const reply = await webhooks.forwardIncoming(session.clientId, payload, {
+          connectedNumber: session.connectedNumber,
+        });
         updateSession(session.sessionId, { lastError: null });
         if (reply && session.sock) {
           const jid = normalizeJid(reply.to);
@@ -453,6 +460,35 @@ function listSessions() {
   return [...sessions.values()].map(serializeSession);
 }
 
+// Auto-resume sesiones que estaban activas antes del último restart de Passenger.
+// Lee de wa_sessions las que tenían estado de "conectado" o "intentando conectar"
+// recientemente y las re-arranca via Baileys (re-usa los creds del disco).
+async function resumeSessions() {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT client_id, session_id FROM wa_sessions
+       WHERE status IN ('ready', 'authenticated', 'starting', 'waiting_qr_scan', 'disconnected')
+       ORDER BY updated_at DESC`,
+    );
+    if (rows.length === 0) {
+      console.log('No sessions to resume');
+      return;
+    }
+    console.log(`Resuming ${rows.length} WA session(s)…`);
+    for (const row of rows) {
+      try {
+        // Lanzamos en paralelo pero sin await para no bloquear startup
+        startSession({ clientId: row.client_id, sessionId: row.session_id, mode: 'normal' })
+          .catch((err) => console.error(`Resume failed for ${row.session_id}:`, err.message));
+      } catch (err) {
+        console.error(`Resume threw for ${row.session_id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('resumeSessions error:', err.message);
+  }
+}
+
 async function listSessionsByClient(clientId) {
   // Combina BD (todas las que pertenecen al cliente) con runtime (estado vivo).
   const [rows] = await pool.execute(
@@ -502,5 +538,6 @@ module.exports = {
   listSessionsByClient,
   getSession,
   lookupClientIdBySessionId,
+  resumeSessions,
   normalizeJid,
 };
