@@ -259,20 +259,34 @@ async function connectSocket(session) {
         if (reply && session.sock) {
           const jid = normalizeJid(reply.to);
           if (jid) {
-            try {
-              const sent = await session.sock.sendMessage(jid, { text: reply.text });
-              if (io) {
-                io.emit('message:outgoing', {
-                  type: 'outgoing_message',
-                  source: 'webhook-response',
-                  sessionId: session.sessionId,
-                  clientId: session.clientId,
-                  timestamp: new Date().toISOString(),
-                  message: { id: sent?.key?.id || null, to: jid, body: reply.text },
-                });
+            // Si el texto trae \n, lo partimos en varios mensajes WhatsApp
+            // para que se sienta más conversacional. Líneas vacías se ignoran.
+            const parts = String(reply.text)
+              .split('\n')
+              .map((p) => p.trim())
+              .filter(Boolean);
+            const chunks = parts.length > 0 ? parts : [String(reply.text)];
+
+            for (let i = 0; i < chunks.length; i++) {
+              try {
+                const sent = await session.sock.sendMessage(jid, { text: chunks[i] });
+                if (io) {
+                  io.emit('message:outgoing', {
+                    type: 'outgoing_message',
+                    source: 'webhook-response',
+                    sessionId: session.sessionId,
+                    clientId: session.clientId,
+                    timestamp: new Date().toISOString(),
+                    message: { id: sent?.key?.id || null, to: jid, body: chunks[i] },
+                  });
+                }
+                if (i < chunks.length - 1) {
+                  await new Promise((r) => setTimeout(r, 800));
+                }
+              } catch (sendErr) {
+                console.error('Error enviando respuesta de webhook:', sendErr.message);
+                break;
               }
-            } catch (sendErr) {
-              console.error('Error enviando respuesta de webhook:', sendErr.message);
             }
           }
         }
