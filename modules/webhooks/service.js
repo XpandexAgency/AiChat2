@@ -98,7 +98,7 @@ async function forwardIncoming(clientId, payload, extras = {}) {
 
   const response = await axios.post(client.webhook_incoming_url, enrichedPayload, {
     headers,
-    timeout: 15000,
+    timeout: 30000,
   });
 
   if (response?.data?.to && response?.data?.text) {
@@ -116,7 +116,7 @@ async function testIncoming(url, secret) {
     timestamp: new Date().toISOString(),
     message: 'Prueba manual desde panel',
   };
-  const response = await axios.post(url, payload, { headers, timeout: 15000 });
+  const response = await axios.post(url, payload, { headers, timeout: 30000 });
   return { status: response.status };
 }
 

@@ -115,7 +115,7 @@ npm run feature:finish
 # promocionar testing a main
 npm run main:promote
 
-# publicar a rama deploy (hostinger)
+# publicar a rama deploy (VPS aichat.xpandex.es)
 npm run publish:deploy
 ```
 

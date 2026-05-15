@@ -1,5 +1,5 @@
 -- Phase 4: pairing token público para que el cliente final escanee el QR
--- sin necesitar login. URL: https://chatbot.cartonlife.net/connect/<token>
+-- sin necesitar login. URL: https://aichat.xpandex.es/connect/<token>
 
 ALTER TABLE clients
   ADD COLUMN pairing_token CHAR(64) NULL AFTER webhook_secret,
