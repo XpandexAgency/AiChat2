@@ -174,6 +174,8 @@ async function connectSocket(session) {
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       const current = sessions.get(session.sessionId);
 
+      const replaced = statusCode === DisconnectReason.connectionReplaced;
+
       if (loggedOut) {
         // IMPORTANTE: NO borramos los creds de disco aquí. Baileys reporta
         // 'loggedOut' a veces por desconexiones espurias, no solo cuando
@@ -186,6 +188,17 @@ async function connectSocket(session) {
           connectedNumber: null,
           qrDataUrl: null,
           lastError: `Sesión rechazada por WhatsApp (${reasonName}). Pulsa "Iniciar" para reintentar o "Eliminar" para vincular un número nuevo.`,
+        });
+        session.sock = null;
+      } else if (replaced) {
+        // Otro proceso (otro worker de Passenger o WhatsApp Web en navegador)
+        // tomó la sesión. NO reconectar — sería un ping-pong infinito que
+        // arruina los contadores de Signal Protocol. Solo dejamos al otro
+        // proceso continuar.
+        updateSession(session.sessionId, {
+          status: 'stopped',
+          connectedNumber: null,
+          lastError: 'Otro proceso o navegador tomó la sesión (connectionReplaced). Si fue accidental, pulsa "Iniciar".',
         });
         session.sock = null;
       } else if (current && current.status !== 'stopped') {
@@ -460,10 +473,62 @@ function listSessions() {
   return [...sessions.values()].map(serializeSession);
 }
 
+// Lock file para evitar que VARIOS workers de Passenger reanuden las mismas
+// sesiones (cada uno crearía su propio Baileys → connectionReplaced ping-pong
+// + MessageCounterError de libsignal). Solo el worker que toma el lock corre
+// resumeSessions; los demás lo dejan en paz.
+function getResumerLockPath() {
+  return path.join(config.AUTH_DATA_PATH, 'resumer.lock');
+}
+
+async function tryAcquireResumerLock() {
+  const lockPath = getResumerLockPath();
+  try {
+    const existing = await fs.readFile(lockPath, 'utf-8');
+    const pid = Number(existing.trim());
+    if (pid && pid !== process.pid) {
+      try {
+        process.kill(pid, 0);  // signal 0 = ¿está vivo?
+        return false;          // otro worker activo tiene el lock
+      } catch {
+        // proceso muerto → lock stale, lo tomamos
+      }
+    }
+  } catch { /* no existe → lo creamos */ }
+  await fs.mkdir(config.AUTH_DATA_PATH, { recursive: true });
+  await fs.writeFile(lockPath, String(process.pid));
+  return true;
+}
+
+async function releaseResumerLock() {
+  const lockPath = getResumerLockPath();
+  try {
+    const existing = await fs.readFile(lockPath, 'utf-8');
+    if (Number(existing.trim()) === process.pid) {
+      await fs.unlink(lockPath);
+    }
+  } catch { /* ignore */ }
+}
+
+process.on('exit', () => {
+  // sync best-effort para liberar el lock cuando termina el worker
+  try {
+    const fsSync = require('fs');
+    const lockPath = getResumerLockPath();
+    if (fsSync.existsSync(lockPath)) {
+      const pid = Number(fsSync.readFileSync(lockPath, 'utf-8').trim());
+      if (pid === process.pid) fsSync.unlinkSync(lockPath);
+    }
+  } catch { /* ignore */ }
+});
+
 // Auto-resume sesiones que estaban activas antes del último restart de Passenger.
-// Lee de wa_sessions las que tenían estado de "conectado" o "intentando conectar"
-// recientemente y las re-arranca via Baileys (re-usa los creds del disco).
 async function resumeSessions() {
+  const gotLock = await tryAcquireResumerLock();
+  if (!gotLock) {
+    console.log('Another worker holds the resumer lock — skipping session resume');
+    return;
+  }
   try {
     const [rows] = await pool.execute(
       `SELECT client_id, session_id FROM wa_sessions
@@ -474,16 +539,20 @@ async function resumeSessions() {
       console.log('No sessions to resume');
       return;
     }
-    console.log(`Resuming ${rows.length} WA session(s)…`);
-    for (const row of rows) {
-      try {
-        // Lanzamos en paralelo pero sin await para no bloquear startup
-        startSession({ clientId: row.client_id, sessionId: row.session_id, mode: 'normal' })
-          .catch((err) => console.error(`Resume failed for ${row.session_id}:`, err.message));
-      } catch (err) {
-        console.error(`Resume threw for ${row.session_id}:`, err.message);
+    console.log(`Resuming ${rows.length} WA session(s)… (worker pid ${process.pid})`);
+    // Concurrencia limitada a 3 para no spamear a WhatsApp si hay muchas
+    const queue = [...rows];
+    const workers = Array.from({ length: 3 }, async () => {
+      while (queue.length > 0) {
+        const row = queue.shift();
+        try {
+          await startSession({ clientId: row.client_id, sessionId: row.session_id, mode: 'normal' });
+        } catch (err) {
+          console.error(`Resume failed for ${row.session_id}:`, err.message);
+        }
       }
-    }
+    });
+    await Promise.allSettled(workers);
   } catch (err) {
     console.error('resumeSessions error:', err.message);
   }
