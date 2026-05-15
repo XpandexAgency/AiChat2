@@ -259,10 +259,10 @@ async function connectSocket(session) {
         if (reply && session.sock) {
           const jid = normalizeJid(reply.to);
           if (jid) {
-            // Si el texto trae \n, lo partimos en varios mensajes WhatsApp
-            // para que se sienta más conversacional. Líneas vacías se ignoran.
+            // Protocolo con n8n: \n = salto de línea dentro del mensaje,
+            // \n\n = separador entre mensajes WhatsApp distintos.
             const parts = String(reply.text)
-              .split('\n')
+              .split(/\n{2,}/)
               .map((p) => p.trim())
               .filter(Boolean);
             const chunks = parts.length > 0 ? parts : [String(reply.text)];
