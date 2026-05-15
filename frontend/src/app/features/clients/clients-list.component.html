@@ -1,0 +1,85 @@
+<header class="page-head">
+  <div>
+    <h1>Clientes</h1>
+    <p class="muted">Gestiona los clientes finales del servicio y sus sesiones de WhatsApp.</p>
+  </div>
+  <div class="actions">
+    <button class="ghost" (click)="toggleActiveOnly()">
+      {{ activeOnly() ? '☑ Solo activos' : '☐ Mostrar todos' }}
+    </button>
+    <button class="ghost" (click)="load()">Refrescar</button>
+    <a class="primary btn-link" routerLink="/clients/new">+ Nuevo cliente</a>
+  </div>
+</header>
+
+@if (error(); as msg) {
+  <p class="error-banner">{{ msg }}</p>
+}
+
+<section class="card">
+  @if (loading()) {
+    <p class="muted">Cargando...</p>
+  } @else if (!clients().length) {
+    <div class="empty">
+      <p>Aún no hay clientes</p>
+      <span>Crea el primero para empezar a gestionar sesiones de WhatsApp.</span>
+    </div>
+  } @else {
+    <table class="data">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nombre</th>
+          <th>Email / Teléfono</th>
+          <th>Estado</th>
+          <th>Webhook</th>
+          <th>Tags</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of clients(); track c.id) {
+          <tr>
+            <td class="mono dim">#{{ c.id }}</td>
+            <td>
+              <a [routerLink]="['/clients', c.id]" class="cell-link">
+                <strong>{{ c.name }}</strong>
+                @if (c.description) {
+                  <span class="dim">{{ c.description }}</span>
+                }
+              </a>
+            </td>
+            <td>
+              @if (c.email) { <div class="mono dim small">{{ c.email }}</div> }
+              @if (c.phone) { <div class="mono dim small">{{ c.phone }}</div> }
+              @if (!c.email && !c.phone) { <span class="dim">—</span> }
+            </td>
+            <td>
+              @if (c.isActive) {
+                <span class="badge ok">Activo</span>
+              } @else {
+                <span class="badge mute">Inactivo</span>
+              }
+            </td>
+            <td>
+              @if (c.webhookIncomingUrl) {
+                <span class="badge info">Configurado</span>
+              } @else {
+                <span class="dim">—</span>
+              }
+            </td>
+            <td>
+              @for (t of c.tags; track t) {
+                <span class="tag">{{ t }}</span>
+              }
+              @if (!c.tags.length) { <span class="dim">—</span> }
+            </td>
+            <td class="right">
+              <a class="ghost btn-link" [routerLink]="['/clients', c.id]">Abrir</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

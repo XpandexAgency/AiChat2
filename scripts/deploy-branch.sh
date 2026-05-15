@@ -2,9 +2,13 @@
 set -euo pipefail
 
 PUSH=false
-if [[ "${1:-}" == "--push" ]]; then
-  PUSH=true
-fi
+REMOTE=false
+for arg in "$@"; do
+  case "$arg" in
+    --push) PUSH=true ;;
+    --remote) PUSH=true; REMOTE=true ;;
+  esac
+done
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
@@ -12,6 +16,8 @@ DEPLOY_DIR="$ROOT_DIR/deploy"
 WORKTREE_DIR="/private/tmp/$(basename "$ROOT_DIR")-deploy-worktree"
 DEPLOY_BRANCH="deploy"
 BASE_BRANCH="main"
+VPS_HOST="${VPS_HOST:-root@5.180.173.8}"
+VPS_APP_DIR="${VPS_APP_DIR:-/www/wwwroot/AiChat}"
 
 echo "==> Building frontend into $DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR"
@@ -39,82 +45,57 @@ find "$WORKTREE_DIR" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 mkdir -p "$WORKTREE_DIR/deploy"
 rsync -a --delete "$DEPLOY_DIR/" "$WORKTREE_DIR/deploy/"
 
+# Copiar TODO backend/src/* a la raíz del worktree.
+# Tras el refactor de Fase 1, server.js depende de config.js, db/, middleware/,
+# modules/, etc. No vale con copiar solo server.js.
+rsync -a \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.baileys_auth/' \
+  --exclude='.wwebjs_auth/' \
+  --exclude='.wwebjs_cache/' \
+  --exclude='node_modules/' \
+  "$ROOT_DIR/backend/src/" "$WORKTREE_DIR/"
+
+# Copiar README desde raíz
+cp "$ROOT_DIR/README.md" "$WORKTREE_DIR/README_PROJECT.md"
+cp "$ROOT_DIR/README_HOSTINGER.md" "$WORKTREE_DIR/README.md"
+
+# Copiar el pull script al worktree (se versiona en deploy para que el VPS
+# pueda invocarse a sí mismo con la versión más reciente).
+mkdir -p "$WORKTREE_DIR/scripts"
+cp "$ROOT_DIR/scripts/vps-deploy-pull.sh" "$WORKTREE_DIR/scripts/vps-deploy-pull.sh"
+chmod +x "$WORKTREE_DIR/scripts/vps-deploy-pull.sh"
+
 cat > "$WORKTREE_DIR/package.json" <<'JSON'
 {
   "name": "chatbot-deploy-runtime",
   "private": true,
   "version": "1.0.0",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "axios": "^1.16.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^7.3.0",
+    "mysql2": "^3.11.3",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3"
   }
 }
 JSON
 
-cat > "$WORKTREE_DIR/server.js" <<'JS'
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-
-const root = path.join(__dirname, 'deploy', 'browser');
-const port = Number(process.env.PORT || 3000);
-
-const mimeTypes = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-};
-
-function sendFile(res, filePath) {
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Internal server error');
-      return;
-    }
-    const ext = path.extname(filePath).toLowerCase();
-    const type = mimeTypes[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': type });
-    res.end(data);
-  });
-}
-
-const server = http.createServer((req, res) => {
-  const safePath = decodeURIComponent((req.url || '/').split('?')[0]);
-  const requested = safePath === '/' ? '/index.html' : safePath;
-  const filePath = path.normalize(path.join(root, requested));
-
-  if (!filePath.startsWith(root)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Forbidden');
-    return;
-  }
-
-  fs.stat(filePath, (err, stat) => {
-    if (!err && stat.isFile()) {
-      sendFile(res, filePath);
-      return;
-    }
-
-    // SPA fallback
-    sendFile(res, path.join(root, 'index.html'));
-  });
-});
-
-server.listen(port, () => {
-  console.log(`Deploy runtime listening on http://localhost:${port}`);
-});
-JS
 
 (
   cd "$WORKTREE_DIR"
@@ -132,6 +113,15 @@ JS
   fi
 )
 
+if $REMOTE; then
+  echo "==> Triggering remote pull on $VPS_HOST:$VPS_APP_DIR"
+  ssh -o StrictHostKeyChecking=accept-new "$VPS_HOST" \
+    "bash $VPS_APP_DIR/scripts/vps-deploy-pull.sh"
+fi
+
 echo "==> Done"
 echo "    build output: $DEPLOY_DIR"
 echo "    branch sync:  $DEPLOY_BRANCH"
+if $REMOTE; then
+  echo "    remote:        $VPS_HOST → restarted"
+fi

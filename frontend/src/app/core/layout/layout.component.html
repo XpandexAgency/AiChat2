@@ -1,0 +1,71 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-logo">
+        <img src="/xpandex-icon.webp" alt="Xpandex" />
+      </span>
+      <div>
+        <strong>XPANDEX</strong>
+        <small>Admin panel</small>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <span class="nav-label">Panel</span>
+      <nav class="nav">
+        <a routerLink="/clients" routerLinkActive="active">
+          <span class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </span>
+          Clientes
+        </a>
+        <a routerLink="/sessions" routerLinkActive="active">
+          <span class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </span>
+          Sesiones
+        </a>
+        <a routerLink="/audit" routerLinkActive="active">
+          <span class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+              <line x1="8" y1="14" x2="16" y2="14"/>
+              <line x1="8" y1="18" x2="13" y2="18"/>
+            </svg>
+          </span>
+          Audit
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="socket-status" [class.ok]="socketConnected()" [class.err]="!socketConnected()">
+        <span class="dot"></span>
+        <span>{{ socketConnected() ? 'En línea' : 'Sin conexión' }}</span>
+      </div>
+      @if (admin(); as a) {
+        <div class="user">
+          <div class="user-avatar">{{ (a.email[0] || '?').toUpperCase() }}</div>
+          <div class="user-meta">
+            <strong title="{{ a.email }}">{{ a.email }}</strong>
+            <button class="link logout" type="button" (click)="logout()">Cerrar sesión</button>
+          </div>
+        </div>
+      }
+    </div>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

@@ -91,4 +91,39 @@ Cuando llega un mensaje en WhatsApp, el backend hace `POST` a `WEBHOOK_INCOMING_
 ## Nota importante
 
 Este proyecto usa `whatsapp-web.js` (automatización de WhatsApp Web), no la API oficial de WhatsApp Business Platform (Cloud API). Para producción empresarial estricta, revisa la opción oficial de Meta.
+
+## Flujo Git recomendado
+
+Ramas:
+
+- `testing`: desarrollo diario
+- `main`: estable
+- `deploy`: artefactos compilados para hosting
+
+Comandos rápidos:
+
+```bash
+# ver estado actual
+npm run flow:status
+
+# crear rama de feature desde testing
+npm run feature:start -- webhook-form-improvements
+
+# integrar feature actual en testing
+npm run feature:finish
+
+# promocionar testing a main
+npm run main:promote
+
+# publicar a rama deploy (VPS aichat.xpandex.es)
+npm run publish:deploy
+```
+
+Flujo habitual:
+
+1. Crear `feature/*`, trabajar, commit y push de la feature.
+2. Integrar feature a `testing`.
+3. Cuando testing está OK, promover a `main`.
+4. Publicar estáticos con `publish:deploy`.
+
 # AiChat2
