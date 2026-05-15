@@ -2,9 +2,13 @@
 set -euo pipefail
 
 PUSH=false
-if [[ "${1:-}" == "--push" ]]; then
-  PUSH=true
-fi
+REMOTE=false
+for arg in "$@"; do
+  case "$arg" in
+    --push) PUSH=true ;;
+    --remote) PUSH=true; REMOTE=true ;;
+  esac
+done
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
@@ -12,6 +16,8 @@ DEPLOY_DIR="$ROOT_DIR/deploy"
 WORKTREE_DIR="/private/tmp/$(basename "$ROOT_DIR")-deploy-worktree"
 DEPLOY_BRANCH="deploy"
 BASE_BRANCH="main"
+VPS_HOST="${VPS_HOST:-root@5.180.173.8}"
+VPS_APP_DIR="${VPS_APP_DIR:-/www/wwwroot/AiChat}"
 
 echo "==> Building frontend into $DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR"
@@ -54,6 +60,12 @@ rsync -a \
 # Copiar README desde raíz
 cp "$ROOT_DIR/README.md" "$WORKTREE_DIR/README_PROJECT.md"
 cp "$ROOT_DIR/README_HOSTINGER.md" "$WORKTREE_DIR/README.md"
+
+# Copiar el pull script al worktree (se versiona en deploy para que el VPS
+# pueda invocarse a sí mismo con la versión más reciente).
+mkdir -p "$WORKTREE_DIR/scripts"
+cp "$ROOT_DIR/scripts/vps-deploy-pull.sh" "$WORKTREE_DIR/scripts/vps-deploy-pull.sh"
+chmod +x "$WORKTREE_DIR/scripts/vps-deploy-pull.sh"
 
 cat > "$WORKTREE_DIR/package.json" <<'JSON'
 {
@@ -101,6 +113,15 @@ JSON
   fi
 )
 
+if $REMOTE; then
+  echo "==> Triggering remote pull on $VPS_HOST:$VPS_APP_DIR"
+  ssh -o StrictHostKeyChecking=accept-new "$VPS_HOST" \
+    "bash $VPS_APP_DIR/scripts/vps-deploy-pull.sh"
+fi
+
 echo "==> Done"
 echo "    build output: $DEPLOY_DIR"
 echo "    branch sync:  $DEPLOY_BRANCH"
+if $REMOTE; then
+  echo "    remote:        $VPS_HOST → restarted"
+fi
