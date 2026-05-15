@@ -108,7 +108,16 @@ function messageType(message) {
 
 async function connectSocket(session) {
   const baileys = await baileysPromise;
-  const makeWASocket = baileys.default || baileys.makeWASocket;
+  // En distintas versiones Baileys exporta makeWASocket de formas distintas:
+  //  - 6.7.x: baileys.default (función)
+  //  - 6.17.x: baileys.makeWASocket (named), baileys.default es un objeto
+  //  - >=7: pendiente confirmar
+  // Cogemos la primera que SEA función.
+  const makeWASocket = [baileys.makeWASocket, baileys.default?.default, baileys.default]
+    .find((x) => typeof x === 'function');
+  if (typeof makeWASocket !== 'function') {
+    throw new Error('Baileys: makeWASocket no encontrado en este build (' + Object.keys(baileys).slice(0,5).join(',') + '...)');
+  }
   const { useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = baileys;
 
   const authDir = path.join(config.AUTH_DATA_PATH, `session-${session.sessionId}`);
