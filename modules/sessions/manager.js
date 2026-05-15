@@ -175,13 +175,18 @@ async function connectSocket(session) {
       const current = sessions.get(session.sessionId);
 
       if (loggedOut) {
+        // IMPORTANTE: NO borramos los creds de disco aquí. Baileys reporta
+        // 'loggedOut' a veces por desconexiones espurias, no solo cuando
+        // realmente se desvincula el dispositivo. Borrar los creds
+        // automáticamente obligaba a re-escanear QR sin razón.
+        // Si los creds son inválidos de verdad, el siguiente "Start" fallará
+        // y se mostrará auth_failure → el usuario decide borrar desde el panel.
         updateSession(session.sessionId, {
           status: 'auth_failure',
           connectedNumber: null,
           qrDataUrl: null,
-          lastError: `Sesión cerrada en WhatsApp (${reasonName}). Vuelve a escanear el QR.`,
+          lastError: `Sesión rechazada por WhatsApp (${reasonName}). Pulsa "Iniciar" para reintentar o "Eliminar" para vincular un número nuevo.`,
         });
-        try { await fs.rm(authDir, { recursive: true, force: true }); } catch { /* ignore */ }
         session.sock = null;
       } else if (current && current.status !== 'stopped') {
         updateSession(session.sessionId, {
